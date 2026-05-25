@@ -23,19 +23,33 @@ ANIM_SPEED = 0.35
 
 class GUI:
     def __init__(self, map_path: str) -> None:
+        #         steps = كل لقطات الفيديو (frames)
+        # cur = أنت في أي لقطة الآن
+        # playing = الفيديو شغال ولا متوقف
+        # play_timer = مؤقت باش ينتقل بين اللقطات تلقائياً
+        # 👉 يعني: التحكم فـ Play / Pause / Next / Prev
         self.steps      = []
         self.cur        = 0
         self.playing    = False
         self.play_timer = 0.0
 
+        # scale = تكبير/تصغير الخريطة
+        # ox, oy = تحريك الخريطة (يمين/يسار/فوق/تحت)
         self.scale = 1.0
         self.ox    = 50.0
         self.oy    = 50.0
+
+        # drag = True → أنت تسحب الآن
+        # drag0 → أول مكان ضغطت فيه
+        # ox0/oy0 → المكان الأصلي قبل السحب
         self.drag  = False
         self.drag0 = (0, 0)
         self.ox0   = 0.0
         self.oy0   = 0.0
 
+        # src = منين بدا
+        # tgt = فين غادي
+        # t = شحال وصل (0 → 1)
         # Animation state
         self.src: dict[int, tuple[float, float]] = {}
         self.tgt: dict[int, tuple[float, float]] = {}

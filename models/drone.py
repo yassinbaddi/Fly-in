@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 from models.zone import Node
 

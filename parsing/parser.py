@@ -20,26 +20,22 @@ class Parser:
         self.nodes: list[Node] = []
         self.drones: list[Drone] = []
         self._seen_names: set[str] = set()
-        # self._seen_positions: set[tuple[int, int]] = set()
+        self._seen_positions: set[tuple[int, int]] = set()
         self._seen_connections: set[frozenset[str]] = set()
         self._parse(file_obj)
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _clean_line(raw: str) -> str:
-        """Strip inline comments (outside brackets) and whitespace."""
-        depth = 0
-        for i, ch in enumerate(raw):
-            if ch == "[":
-                depth += 1
-            elif ch == "]" and depth > 0:
-                depth -= 1
-            elif ch == "#" and depth == 0:
-                return raw[:i].strip()
-        return raw.strip()
+    # @staticmethod
+    # def _clean_line(raw: str) -> str:
+    #     """Strip inline comments (outside brackets) and whitespace."""
+    #     depth = 0
+    #     for i, ch in enumerate(raw):
+    #         if ch == "[":
+    #             depth += 1
+    #         elif ch == "]" and depth > 0:
+    #             depth -= 1
+    #         elif ch == "#" and depth == 0:
+    #             return raw[:i].strip()
+    #     return raw.strip()
 
     @staticmethod
     def _extract_attrs(text: str, lineno: int) -> tuple[str, str]:
@@ -104,7 +100,9 @@ class Parser:
         in_connections = False
 
         for lineno, raw in enumerate(f, 1):
-            line = self._clean_line(raw)
+            line = raw.split("#", 1)[0].strip()
+
+            # line = self._clean_line(raw)
             if not line:
                 continue
 
@@ -211,10 +209,10 @@ class Parser:
 
         if name in self._seen_names:
             raise ValueError(f"line {lineno}: duplicated hub name {name!r}")
-        # if (x, y) in self._seen_positions:
-        #     raise ValueError(
-        #         f"line {lineno}: position ({x}, {y}) already used by another hub"
-        #     )
+        if (x, y) in self._seen_positions:
+            raise ValueError(
+                f"line {lineno}: position ({x}, {y}) already used by another hub"
+            )
 
         attrs = self._parse_kv(raw_attrs, HUB_ATTRS, lineno)
 
@@ -236,7 +234,7 @@ class Parser:
                 )
 
         self._seen_names.add(name)
-        # self._seen_positions.add((x, y))
+        self._seen_positions.add((x, y))
 
         return Node(kind, name, x, y, zone, color, max_drones)
 
