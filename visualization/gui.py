@@ -1,11 +1,12 @@
-"""Pygame GUI for the drone simulation."""
 from __future__ import annotations
 import sys
 import threading
+import os
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = ''
 import pygame
 from parsing.parser import Parser
 from pathfinding.routing import Pathfinder
-from simulation.engine import Simulation
+from simulation.engine import COLORS, RESET, Simulation
 
 NODE_COLORS = {
     "start_hub":  (0, 170, 85),
@@ -68,8 +69,8 @@ class GUI:
                 parsed = Parser(f)
                 self.nodes  = parsed.nodes
                 self.drones = parsed.drones
-            except Exception as e:
-                print("Error: ", e)
+            except Exception as err:
+                print(COLORS[0],"Error: ", err, RESET)
                 sys.exit(1)
 
     def _init_pygame(self):
@@ -88,7 +89,7 @@ class GUI:
         try:
             Pathfinder(self.drones, self.nodes)
         except Exception as err:
-            print("Error: ", err)
+            print(COLORS[0],"Error: ", err, RESET)
             sys.exit(1)
             
 

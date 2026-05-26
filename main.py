@@ -1,4 +1,5 @@
 import sys
+from simulation.engine import COLORS, RESET
 from visualization.gui import GUI
 
 
@@ -10,8 +11,11 @@ def main() -> None:
     try:
         GUI(sys.argv[1]).run()
     except Exception as err:
-        print("Error: ", err)
+        print(COLORS[0],"Error: ", err, RESET)
         sys.exit()
+    except KeyboardInterrupt:
+        print(COLORS[2],"Keyboard Interrupt", RESET)
+        sys.exit(130)
 
 
 if __name__ == "__main__":

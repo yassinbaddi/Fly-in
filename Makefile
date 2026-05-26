@@ -7,22 +7,23 @@ install:
 add:
 	@uv add $(pkg)
 
+# in linux || true
 run:
-	@python main.py map.txt
+	@python main.py map.txt  || exit /b 0 
 
 run_easy_1:
-	@python main.py maps/easy/01_linear_path.txt
+	@python main.py maps/easy/01_linear_path.txt 
 
 run_easy_2:
-	@python main.py maps/easy/02_simple_fork.txt
+	@python main.py maps/easy/02_simple_fork.txt 
 
 run_easy_3:
-	@python main.py maps/easy/01_linear_path.txt
+	@python main.py maps/easy/01_linear_path.txt  
 
 # -------------------------------------------------
 
 run_medium_1:
-	@python main.py maps/medium\01_dead_end_trap.txt
+	@python main.py maps/medium\01_dead_end_trap.txt 
 
 run_medium_2:
 	@python main.py maps/medium/02_circular_loop.txt

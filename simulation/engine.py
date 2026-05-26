@@ -6,13 +6,15 @@ from models.drone import Drone
 Snapshot = dict[int, dict[str, object]]
 StepCallback = Callable[[int, Snapshot], None]
 
+
+# 🎨 ANSI COLORS
 COLORS = [
-    "\033[91m",
-    "\033[92m",
-    "\033[93m",
-    "\033[94m",
-    "\033[95m",
-    "\033[96m",
+    "\033[91m",  # red
+    "\033[92m",  # green
+    "\033[93m",  # yellow
+    "\033[94m",  # blue
+    "\033[95m",  # magenta
+    "\033[96m",  # cyan
 ]
 RESET = "\033[0m"
 
@@ -63,7 +65,7 @@ class Simulation:
             if on_step is not None:
                 snapshot: Snapshot = {
                     d.id: {
-                        "zone": curr.name,
+                        "zone": d.current_zone.name,
                         "arrived": d.is_arrived,
                         "buffer": d.restricted_buffer,
                     }
