@@ -66,14 +66,14 @@ class GUI:
         pygame.init()
         self.screen = pygame.display.set_mode((1000, 650), pygame.RESIZABLE)
         icon = pygame.image.load('icons/drone-icon.png')
-        pygame.display.set_caption("Drone Simulation")
         pygame.display.set_icon(icon)
+        pygame.display.set_caption("Drone Simulation")
         self.font = pygame.font.SysFont("Consolas", 13, bold=True)
 
     def _run_gui(self) -> None:
         raw   = {n.name: (float(n.x), float(n.y)) for n in self.nodes}
         max_y = max(y for _, y in raw.values())
-        self.pos = {k: (x, max_y - y) for k, (x, y) in raw.items()}
+        self.pos = {k: (x, max_y - y -1) for k, (x, y) in raw.items()}
 
         self._fit_view()
         self._reset_anim()
@@ -82,7 +82,6 @@ class GUI:
         except Exception as err:
             print(COLORS[0],"Error: ", err, RESET)
             sys.exit(1)
-            
 
         sim = Simulation(self.drones, self.nodes)
         threading.Thread(

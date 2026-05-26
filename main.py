@@ -12,7 +12,7 @@ def main() -> None:
         GUI(sys.argv[1]).run()
     except Exception as err:
         print(COLORS[0],"Error: ", err, RESET)
-        sys.exit()
+        sys.exit(1)
     except KeyboardInterrupt:
         print(COLORS[2],"Keyboard Interrupt", RESET)
         sys.exit(130)

@@ -50,6 +50,10 @@ run-args:
 sync:
 	@uv pip compile requirements.txt -o uv.lock
 
+.PHONY: clean
+
+
+
 clean:
-	@rm -rf __pycache__
-	@rm -rf .venv
+	@del /s /q *.pyc 2>nul
+	@rmdir /s /q __pycache__ 2>nul
