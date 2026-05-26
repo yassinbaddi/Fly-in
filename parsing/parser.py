@@ -168,7 +168,6 @@ class Parser:
                 middle.append(n)
         self.nodes = [start_node] + middle + [end_node]
         self.drones = [Drone(i, start_node) for i in range(1, nb_drones + 1)]
-        print('self.drones: ', self.drones)
 
     # --- Hub ---
     def _parse_hub(self, kind: str, rest: str, nu_line: int) -> Node:
