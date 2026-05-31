@@ -56,4 +56,4 @@ sync:
 
 clean:
 	@del /s /q *.pyc 2>nul
-	@rmdir /s /q __pycache__ 2>nul
+	@rmdir /s /q __pycache__ .mypy_cache 2>nul

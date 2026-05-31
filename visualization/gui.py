@@ -64,7 +64,7 @@ class GUI:
 
     def _init_pygame(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((1000, 650), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode((1300, 950), pygame.RESIZABLE)
         icon = pygame.image.load('icons/drone-icon.png')
         pygame.display.set_icon(icon)
         pygame.display.set_caption("Drone Simulation")
@@ -219,16 +219,62 @@ class GUI:
             self._label(icons.get(node.map_definition, "."), (255, 255, 255), cx, cy)
             self._label(node.name, (170, 187, 204), cx, cy + 30)
 
+
+    def _group_offset(self, index: int, group_size: int) -> tuple[int, int]:
+        """
+        Calculate (dx, dy) pixel offset for a drone within a group sharing
+        the same node so all drones remain visible without overlapping.
+
+        Layout strategy:
+        - 1 drone  → no offset (centered on node)
+        - 2 drones → side by side horizontally
+        - 3+ drones → arranged in a circle around the node center
+        """
+        if group_size == 1:
+            return (0, 0)
+
+        if group_size == 2:
+            # Simple horizontal split: left and right
+            offsets = [(-10, 0), (10, 0)]
+            return offsets[index]
+
+        # For 3 or more, distribute evenly around a circle
+        import math
+        radius = 10 + (group_size - 3) * 2   # Slightly expand radius for larger groups
+        angle = (2 * math.pi / group_size) * index - math.pi / 2  # Start from top
+        dx = int(round(radius * math.cos(angle)))
+        dy = int(round(radius * math.sin(angle)))
+        return (dx, dy)
+
     def _draw_drones(self) -> None:
+        # Group drones by their interpolated screen position (snapped to grid)
+        position_groups: dict[tuple[int, int], list[int]] = {}
+
         for d in self.drones:
-            # Use interpolated position for smooth animation
             cx, cy = self._to_screen(*self._interp(d.id))
+            key = (cx, cy)
+            position_groups.setdefault(key, []).append(d.id)
+
+        # Build a lookup: drone_id -> (cx, cy, index_in_group, group_size)
+        drone_render_info: dict[int, tuple[int, int, int, int]] = {}
+        for (cx, cy), group in position_groups.items():
+            for index, did in enumerate(group):
+                drone_render_info[did] = (cx, cy, index, len(group))
+
+        for d in self.drones:
+            cx, cy, index, group_size = drone_render_info[d.id]
+
+            # Calculate offset so drones fan out when sharing a node
+            offset_x, offset_y = self._group_offset(index, group_size)
+            cx += offset_x
+            cy += offset_y
+
             color = self._drone_color(d.id)
-            
+
             arrived = False
             if self.steps and self.cur > 0:
                 arrived = self.steps[self.cur - 1].get(d.id, {}).get("arrived", False)
-            
+
             pygame.draw.circle(self.screen, color, (cx, cy), 9)
             pygame.draw.circle(self.screen, (255, 255, 255), (cx, cy), 9, 2)
             self._label("!" if arrived else f"D{d.id}", (0, 0, 0), cx, cy)

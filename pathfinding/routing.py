@@ -1,143 +1,129 @@
 from __future__ import annotations
 import heapq
+from collections import defaultdict
+from dataclasses import dataclass, field
 from models.zone import Node
-from models.drone import Drone
-from models.drone import WAIT_X
+from models.drone import Drone, WAIT_X
+
+WAIT_NODE = Node("w", "w", WAIT_X, WAIT_X)
+MAX_SEARCH_TIME = 300
 
 
-def _wait_node() -> Node:
-    """Return a virtual one-turn wait node."""
-    return Node("w", "w", WAIT_X, WAIT_X)
+@dataclass
+class SearchState:
+    cost: float
+    time: int
+    current_node: str
+    path: list = field(default_factory=list)
+
+    # لترتيب الـ heap بدون مقارنة list
+    def __lt__(self, other):
+        return self.cost < other.cost
 
 
 class Pathfinder:
-    """Assign collision-free space-time paths to every drone."""
-
     def __init__(self, drones: list[Drone], nodes: list[Node]) -> None:
-        """Run pathfinding immediately."""
-        self.drones = drones
-        self.nodes = nodes
-        self._assign_paths()
+        self.node_map        = {node.name: node for node in nodes}
+        self.start_node      = nodes[0].name
+        self.end_node        = nodes[-1].name
+        self.node_reservations = defaultdict(lambda: defaultdict(int))
+        self.link_reservations = defaultdict(lambda: defaultdict(int))
 
-    def _assign_paths(self) -> None:
-        """Assign a collision-free path to each drone in turn using Space-Time Dijkstra."""
-        start = self.nodes[0]
-        end = self.nodes[-1]
-        node_map = {n.name: n for n in self.nodes}
+        for drone in drones:
+            best_path = self._find_path()
+            self._reserve_path(best_path)
+            drone.path = [
+                WAIT_NODE if next_node == current_node else self.node_map[next_node]
+                for (current_node, _), (next_node, _) in zip(best_path, best_path[1:])
+            ]
 
-        # Global reservation tables
-        node_reservations: dict[int, dict[str, int]] = {}
-        link_reservations: dict[int, dict[frozenset[str], int]] = {}
+    # ── البحث ────────────────────────────────────────────────────────────────
 
-        def get_node_res(t: int, name: str) -> int:
-            return node_reservations.get(t, {}).get(name, 0)
+    def _find_path(self) -> list[tuple[str, int]]:
+        heap = [SearchState(0.0, 0, self.start_node, [(self.start_node, 0)])]
+        best_cost = {(self.start_node, 0): 0.0}
 
-        def get_link_res(t: int, u: str, v: str) -> int:
-            return link_reservations.get(t, {}).get(frozenset([u, v]), 0)
+        while heap:
+            state = heapq.heappop(heap)
 
-        def reserve_node(t: int, name: str) -> None:
-            node_reservations.setdefault(t, {})
-            node_reservations[t][name] = node_reservations[t].get(name, 0) + 1
+            if state.cost > best_cost.get((state.current_node, state.time), float("inf")):
+                continue
+            if state.current_node == self.end_node:
+                return state.path
+            if state.time >= MAX_SEARCH_TIME:
+                continue
 
-        def reserve_link(t: int, u: str, v: str) -> None:
-            key = frozenset([u, v])
-            link_reservations.setdefault(t, {})
-            link_reservations[t][key] = link_reservations[t].get(key, 0) + 1
+            for next_node, delta_time, move_cost in self._get_edges(state.current_node, state.time):
+                new_cost     = state.cost + move_cost
+                new_time     = state.time + delta_time
+                new_path     = state.path + [(next_node, new_time)]
 
-        for drone in self.drones:
-            # Heap contains: (cost, time, current_node_name, path_of_states)
-            heap: list[tuple[float, int, str, list[tuple[str, int]]]] = []
-            heapq.heappush(heap, (0.0, 0, start.name, [(start.name, 0)]))
+                if new_cost < best_cost.get((next_node, new_time), float("inf")):
+                    best_cost[(next_node, new_time)] = new_cost
+                    heapq.heappush(heap, SearchState(new_cost, new_time, next_node, new_path))
 
-            visited: dict[tuple[str, int], float] = {(start.name, 0): 0.0}
-            best_path: list[tuple[str, int]] | None = None
+        raise ValueError(f"No path found: {self.start_node} → {self.end_node}")
 
-            max_search_time = 300
+    # ── الحواف الممكنة ────────────────────────────────────────────────────────
 
-            while heap:
-                cost, t, u, path_states = heapq.heappop(heap)
+    def _get_edges(self, current: str, time: int) -> list[tuple[str, int, float]]:
+        current_node = self.node_map[current]
 
-                if cost > visited.get((u, t), float("inf")):
-                    continue
+        # انتظار في المكان الحالي
+        can_wait = current == self.start_node or \
+                   self.node_reservations[time+1][current] < current_node.max_drone
+        wait_edge = [(current, 1, 1.0)] if can_wait else []
 
-                if u == end.name:
-                    best_path = path_states
-                    break
+        # التحرك الى العقد المجاورة
+        def get_move_edge(neighbor: str, link_capacity: int) -> tuple | None:
+            neighbor_node = self.node_map[neighbor]
+            link_key      = frozenset([current, neighbor])
 
-                if t >= max_search_time:
-                    continue
+            if neighbor_node.zone == "blocked":
+                return None
+            if self.link_reservations[time][link_key] >= link_capacity:
+                return None
 
-                u_node = node_map[u]
+            if neighbor_node.zone == "restricted":
+                link_is_full_next  = self.link_reservations[time+1][link_key] >= link_capacity
+                node_is_full       = neighbor != self.end_node and \
+                                     self.node_reservations[time+2][neighbor] >= neighbor_node.max_drone
+                if link_is_full_next or node_is_full:
+                    return None
+                return (neighbor, 2, 2.0)
+            else:
+                node_is_full = neighbor != self.end_node and \
+                               self.node_reservations[time+1][neighbor] >= neighbor_node.max_drone
+                if node_is_full:
+                    return None
+                return (neighbor, 1, neighbor_node.cost)
 
-                # Transition 1: Wait in place at u
-                if u == start.name or get_node_res(t + 1, u) < u_node.max_drone:
-                    new_cost = cost + 1.0
-                    if new_cost < visited.get((u, t + 1), float("inf")):
-                        visited[(u, t + 1)] = new_cost
-                        heapq.heappush(heap, (new_cost, t + 1, u, path_states + [(u, t + 1)]))
+        move_edges = [
+            edge
+            for neighbor, capacity in current_node.connections
+            if (edge := get_move_edge(neighbor, capacity))
+        ]
 
-                # Transitions 2 & 3: Move to neighbors
-                for v_name, cap in u_node.connections:
-                    v_node = node_map[v_name]
-                    if v_node.zone == "blocked":
-                        continue
+        return wait_edge + move_edges
 
-                    if get_link_res(t, u, v_name) >= cap:
-                        continue
+    # ── الحجز ────────────────────────────────────────────────────────────────
 
-                    if v_node.zone == "restricted":
-                        # Multi-turn movement: takes 2 turns (arrives at t+2)
-                        if get_link_res(t + 1, u, v_name) >= cap:
-                            continue
-                        if v_name != end.name and get_node_res(t + 2, v_name) >= v_node.max_drone:
-                            continue
+    def _reserve_path(self, path: list[tuple[str, int]]) -> None:
+        for (current_node, current_time), (next_node, next_time) in zip(path, path[1:]):
+            link_key = frozenset([current_node, next_node])
 
-                        new_cost = cost + 2.0
-                        if new_cost < visited.get((v_name, t + 2), float("inf")):
-                            visited[(v_name, t + 2)] = new_cost
-                            heapq.heappush(heap, (new_cost, t + 2, v_name, path_states + [(v_name, t + 2)]))
-                    else:
-                        # Normal / Priority: takes 1 turn (arrives at t+1)
-                        if v_name != end.name and get_node_res(t + 1, v_name) >= v_node.max_drone:
-                            continue
+            if next_node == current_node:  # انتظار
+                for step in range(current_time+1, next_time+1):
+                    if current_node != self.start_node:
+                        self.node_reservations[step][current_node] += 1
 
-                        new_cost = cost + v_node.cost
-                        if new_cost < visited.get((v_name, t + 1), float("inf")):
-                            visited[(v_name, t + 1)] = new_cost
-                            heapq.heappush(heap, (new_cost, t + 1, v_name, path_states + [(v_name, t + 1)]))
+            elif self.node_map[next_node].zone == "restricted":
+                self.link_reservations[current_time][link_key]   += 1
+                self.link_reservations[current_time+1][link_key] += 1
+                if next_node != self.end_node:
+                    self.node_reservations[next_time][next_node] += 1
 
-            if best_path is None:
-                raise ValueError(f"No collision-free path found for drone {drone.id}")
-
-            # Reserve path in global tracking tables
-            for i in range(len(best_path) - 1):
-                u, tu = best_path[i]
-                v, tv = best_path[i + 1]
-
-                if v == u:
-                    for step in range(tu + 1, tv + 1):
-                        if u != start.name:
-                            reserve_node(step, u)
-                else:
-                    v_node = node_map[v]
-                    if v_node.zone == "restricted":
-                        reserve_link(tu, u, v)
-                        reserve_link(tu + 1, u, v)
-                        if v != end.name:
-                            reserve_node(tv, v)
-                    else:
-                        reserve_link(tu, u, v)
-                        if v != end.name:
-                            reserve_node(tv, v)
-
-            # Convert space-time sequence to standard path list
-            drone_path_nodes: list[Node] = []
-            for i in range(len(best_path) - 1):
-                u, tu = best_path[i]
-                v, tv = best_path[i + 1]
-                if v == u:
-                    drone_path_nodes.append(_wait_node())
-                else:
-                    drone_path_nodes.append(node_map[v])
-
-            drone.path = drone_path_nodes
+            else:
+                self.link_reservations[current_time][link_key] += 1
+                if next_node != self.end_node:
+                    self.node_reservations[next_time][next_node] += 1
