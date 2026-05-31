@@ -16,7 +16,6 @@ class SearchState:
     current_node: str
     path: list = field(default_factory=list)
 
-    # لترتيب الـ heap بدون مقارنة list
     def __lt__(self, other):
         return self.cost < other.cost
 
@@ -36,8 +35,6 @@ class Pathfinder:
                 WAIT_NODE if next_node == current_node else self.node_map[next_node]
                 for (current_node, _), (next_node, _) in zip(best_path, best_path[1:])
             ]
-
-    # ── البحث ────────────────────────────────────────────────────────────────
 
     def _find_path(self) -> list[tuple[str, int]]:
         heap = [SearchState(0.0, 0, self.start_node, [(self.start_node, 0)])]
@@ -64,17 +61,13 @@ class Pathfinder:
 
         raise ValueError(f"No path found: {self.start_node} → {self.end_node}")
 
-    # ── الحواف الممكنة ────────────────────────────────────────────────────────
-
     def _get_edges(self, current: str, time: int) -> list[tuple[str, int, float]]:
         current_node = self.node_map[current]
 
-        # انتظار في المكان الحالي
         can_wait = current == self.start_node or \
                    self.node_reservations[time+1][current] < current_node.max_drone
         wait_edge = [(current, 1, 1.0)] if can_wait else []
 
-        # التحرك الى العقد المجاورة
         def get_move_edge(neighbor: str, link_capacity: int) -> tuple | None:
             neighbor_node = self.node_map[neighbor]
             link_key      = frozenset([current, neighbor])
@@ -106,13 +99,11 @@ class Pathfinder:
 
         return wait_edge + move_edges
 
-    # ── الحجز ────────────────────────────────────────────────────────────────
-
     def _reserve_path(self, path: list[tuple[str, int]]) -> None:
         for (current_node, current_time), (next_node, next_time) in zip(path, path[1:]):
             link_key = frozenset([current_node, next_node])
 
-            if next_node == current_node:  # انتظار
+            if next_node == current_node:
                 for step in range(current_time+1, next_time+1):
                     if current_node != self.start_node:
                         self.node_reservations[step][current_node] += 1

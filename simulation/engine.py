@@ -7,7 +7,7 @@ Snapshot = dict[int, dict[str, object]]
 StepCallback = Callable[[int, Snapshot], None]
 
 
-# 🎨 ANSI COLORS
+# ANSI COLORS
 COLORS = [
     "\033[91m",  # red
     "\033[92m",  # green

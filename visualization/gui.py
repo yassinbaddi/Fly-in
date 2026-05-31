@@ -41,7 +41,6 @@ class GUI:
         self.ox0   = 0.0
         self.oy0   = 0.0
 
-        # Animation state
         self.src: dict[int, tuple[float, float]] = {}
         self.tgt: dict[int, tuple[float, float]] = {}
         self.t:   dict[int, float] = {}
@@ -49,8 +48,6 @@ class GUI:
         self._lead_map_file(map_path)
         self._init_pygame()
         self._run_gui()
-
-    # ── Setup ─────────────────────────────────────────────────────────
 
     def _lead_map_file(self, path):
         with open(path) as f:
@@ -106,8 +103,6 @@ class GUI:
             self.tgt[d.id] = start
             self.t[d.id] = 1.0
 
-    # ── Helpers ───────────────────────────────────────────────────────
-
     def _to_screen(self, x: float, y: float) -> tuple[int, int]:
         return (int(x * self.scale + self.ox),
                 int(y * self.scale + self.oy + 50))
@@ -115,7 +110,6 @@ class GUI:
     def _interp(self, did: int) -> tuple[float, float]:
         """Smooth interpolation between source and target positions."""
         p = self.t[did]
-        # Smoothstep easing
         e = p * p * (3 - 2 * p)
         sx, sy = self.src[did]
         tx, ty = self.tgt[did]
@@ -135,8 +129,6 @@ class GUI:
                 for info in self.steps[self.cur - 1].values()
                 if isinstance(info, dict)}
 
-    # ── Playback ──────────────────────────────────────────────────────
-
     def _apply_step(self, index: int) -> None:
         if not (self.steps and 0 <= index < len(self.steps)):
             return
@@ -146,7 +138,6 @@ class GUI:
             if zone not in self.pos:
                 continue
             wx, wy = self.pos[zone]
-            # Start animation if position changed
             if (wx, wy) != self.tgt[d.id]:
                 self.src[d.id] = self._interp(d.id)
                 self.tgt[d.id] = (wx, wy)
@@ -174,8 +165,6 @@ class GUI:
         self.playing = not self.playing
         if self.playing and self.cur >= len(self.steps):
             self.cur = 0
-
-    # ── Drawing ───────────────────────────────────────────────────────
 
     def _draw(self) -> None:
         self.screen.fill((15, 15, 30))
@@ -206,7 +195,7 @@ class GUI:
             cx, cy = self._to_screen(*self.pos[node.name])
             active = node.name in occupied
             
-            # Fix zone specific coloring for normal/restricted/blocked hubs
+
             if node.map_definition == "hub":
                 color = NODE_COLORS.get(node.zone, NODE_COLORS["hub"])
             else:
@@ -234,20 +223,17 @@ class GUI:
             return (0, 0)
 
         if group_size == 2:
-            # Simple horizontal split: left and right
             offsets = [(-10, 0), (10, 0)]
             return offsets[index]
 
-        # For 3 or more, distribute evenly around a circle
         import math
-        radius = 10 + (group_size - 3) * 2   # Slightly expand radius for larger groups
-        angle = (2 * math.pi / group_size) * index - math.pi / 2  # Start from top
+        radius = 10 + (group_size - 3) * 2
+        angle = (2 * math.pi / group_size) * index - math.pi / 2
         dx = int(round(radius * math.cos(angle)))
         dy = int(round(radius * math.sin(angle)))
         return (dx, dy)
 
     def _draw_drones(self) -> None:
-        # Group drones by their interpolated screen position (snapped to grid)
         position_groups: dict[tuple[int, int], list[int]] = {}
 
         for d in self.drones:
@@ -255,7 +241,6 @@ class GUI:
             key = (cx, cy)
             position_groups.setdefault(key, []).append(d.id)
 
-        # Build a lookup: drone_id -> (cx, cy, index_in_group, group_size)
         drone_render_info: dict[int, tuple[int, int, int, int]] = {}
         for (cx, cy), group in position_groups.items():
             for index, did in enumerate(group):
@@ -264,7 +249,6 @@ class GUI:
         for d in self.drones:
             cx, cy, index, group_size = drone_render_info[d.id]
 
-            # Calculate offset so drones fan out when sharing a node
             offset_x, offset_y = self._group_offset(index, group_size)
             cx += offset_x
             cy += offset_y
@@ -293,8 +277,6 @@ class GUI:
         surf = self.font.render(f"Step {self.cur} / {len(self.steps)}",
                                 True, (170, 170, 170))
         self.screen.blit(surf, (W - surf.get_width() - 16, 16))
-
-    # ── Events ────────────────────────────────────────────────────────
 
     def _handle_events(self) -> None:
         for event in pygame.event.get():
@@ -338,15 +320,11 @@ class GUI:
                 self.ox = mx - f * (mx - self.ox)
                 self.oy = my - f * (my - self.oy)
 
-    # ── Main loop ─────────────────────────────────────────────────────
-
     def _update(self, dt: float) -> None:
-        # Update animation progress for all drones
         for d in self.drones:
             if self.t[d.id] < 1.0:
                 self.t[d.id] = min(1.0, self.t[d.id] + dt / ANIM_SPEED)
 
-        # Auto-play
         if self.playing and self.steps:
             self.play_timer += dt
             if self.play_timer >= PLAY_INTERVAL:

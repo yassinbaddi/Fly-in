@@ -1,7 +1,7 @@
 from __future__ import annotations
 from models.zone import Node
 
-WAIT_X = -1  # sentinel x for virtual wait nodes
+WAIT_X = -1
 
 
 class Drone:
@@ -27,7 +27,6 @@ class Drone:
         if self.is_arrived or not self.path:
             return
 
-        # Handle in-flight to restricted zone (Turn 2 of 2)
         if self.restricted_buffer > 0:
             self.restricted_buffer -= 1
             if self.restricted_buffer == 0:
@@ -36,17 +35,14 @@ class Drone:
                     self.is_arrived = True
             return
 
-        # Handle wait nodes
         if self.path[0].x == WAIT_X:
             self.path.pop(0)
             return
 
-        # Check if next move is to restricted zone (Turn 1 of 2)
         if self.path[0].zone == "restricted":
             self.restricted_buffer = 1
             return
 
-        # Normal movement
         self.current_zone = self.path.pop(0)
         if self.current_zone.map_definition == "end_hub":
             self.is_arrived = True
