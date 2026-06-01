@@ -44,6 +44,11 @@ run_hard_3:
 
 # -------------------------------------------------
 
+
+run_challenger:
+	@python main.py maps/challenger/01_the_impossible_dream.txt
+
+# -------------------------------------------------
 run-args:
 	@uv run python main.py $(args)
 
