@@ -18,7 +18,7 @@ run_easy_2:
 	@python main.py maps/easy/02_simple_fork.txt 
 
 run_easy_3:
-	@python main.py maps/easy/01_linear_path.txt  
+	@python main.py maps/easy/03_basic_capacity.txt
 
 # -------------------------------------------------
 
