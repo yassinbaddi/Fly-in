@@ -1,7 +1,5 @@
 from __future__ import annotations
-
 import heapq
-from collections import defaultdict
 
 from models.zone import Node
 from models.drone import Drone, WAIT_X
@@ -15,81 +13,95 @@ class Pathfinder:
         self.node_map = {n.name: n for n in nodes}
         self.start = nodes[0].name
         self.end = nodes[-1].name
-        self.reserved = defaultdict(int)
+
+        self.busy_nodes = set()
+        self.busy_connection = set()
 
         for drone in drones:
             path = self._find_path()
             self._reserve(path)
+
             drone.path = [
-                WAIT_NODE if b == a else self.node_map[b]
+                WAIT_NODE if a == b else self.node_map[b]
                 for (a, _), (b, _) in zip(path, path[1:])
             ]
 
-    def _find_path(self) -> list[tuple[str, int]]:
-        heap = [(0.0, 0, self.start)]
-        best = {(self.start, 0): 0.0}
+    def _find_path(self):
+        heap: list[tuple[float, int, str]] = [(0, 0, self.start)]
+        best = {}
+
         parent = {}
 
         while heap:
             cost, time, node = heapq.heappop(heap)
 
-            if cost > best.get((node, time), float("inf")):
+            if (node, time) in best and best[(node, time)] < cost:
                 continue
+            best[(node, time)] = cost
 
             if node == self.end:
-                path, state = [], (node, time)
+                state = (node, time)
+                path = [state]
                 while state in parent:
-                    path.append(state)
                     state = parent[state]
-                path.append(state)
-                return list(reversed(path))
+                    path.append(state)
+                path.reverse()
+                return path
 
             if time >= MAX_TIME:
                 continue
 
-            for neighbor, dt, edge_cost in self._edges(node, time):
-                new_state = (neighbor, time + dt)
+            for nxt, dt, edge_cost in self._connection(node, time):
+                state = (nxt, time + dt)
                 new_cost = cost + edge_cost
-                if new_cost < best.get(new_state, float("inf")):
-                    best[new_state] = new_cost
-                    parent[new_state] = (node, time)
-                    heapq.heappush(heap, (new_cost, time + dt, neighbor))
 
-        raise ValueError(f"No path found: {self.start} -> {self.end}")
+                if new_cost < best.get(state, float("inf")):
+                    best[state] = new_cost
+                    parent[state] = (node, time)
+                    heapq.heappush(heap, (new_cost, time + dt, nxt))
 
-    def _edges(self, current: str, time: int) -> list[tuple[str, int, float]]:
+        raise ValueError("No path found")
+
+    def _connection(self, current, time):
         node = self.node_map[current]
-        edges = [(current, 1, 1.0)]
 
-        for neighbor, capacity in node.connections:
+        connection = [(current, 1, 1.0)]
+
+        for neighbor, _ in node.connections:
             n = self.node_map[neighbor]
+
             if n.zone == "blocked":
                 continue
 
-            link = frozenset((current, neighbor))
             dur = 2 if n.zone == "restricted" else 1
             cost = 2.0 if dur == 2 else n.cost
 
+            link = tuple(sorted((current, neighbor)))
+
             blocked = False
+
             for i in range(dur):
-                if self.reserved[time + i, link] >= capacity:
+                if (time + i, link) in self.busy_connection:
                     blocked = True
                     break
+
             if blocked:
                 continue
 
-            if neighbor != self.end and self.reserved[time + dur, neighbor] >= n.max_drone:
+            if neighbor != self.end and (time + dur, neighbor) in self.busy_nodes:
                 continue
 
-            edges.append((neighbor, dur, cost))
+            connection.append((neighbor, dur, cost))
 
-        # print(edges)
-        return edges
+        return connection
 
-    def _reserve(self, path: list[tuple[str, int]]) -> None:
-        for (a, t), (b, t2) in zip(path, path[1:]):
-            link = frozenset((a, b))
-            for dt in range(t2 - t):
-                self.reserved[t + dt, link if a != b else a] += 1
-            if b != a and b != self.end:
-                self.reserved[t2, b] += 1
+    def _reserve(self, path):
+        for (a, t1), (b, t2) in zip(path, path[1:]):
+            if a == b:
+                self.busy_nodes.add((t1, a))
+            else:
+                link = (a, b)
+                for t in range(t1, t2):
+                    self.busy_connection.add((t, link))
+                if b != self.end:
+                    self.busy_nodes.add((t2, b))
