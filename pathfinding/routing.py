@@ -70,13 +70,20 @@ class Pathfinder:
             dur = 2 if n.zone == "restricted" else 1
             cost = 2.0 if dur == 2 else n.cost
 
-            if any(self.reserved[time + i, link] >= capacity for i in range(dur)):
+            blocked = False
+            for i in range(dur):
+                if self.reserved[time + i, link] >= capacity:
+                    blocked = True
+                    break
+            if blocked:
                 continue
+
             if neighbor != self.end and self.reserved[time + dur, neighbor] >= n.max_drone:
                 continue
 
             edges.append((neighbor, dur, cost))
 
+        # print(edges)
         return edges
 
     def _reserve(self, path: list[tuple[str, int]]) -> None:

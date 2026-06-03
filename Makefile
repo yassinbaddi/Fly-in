@@ -1,3 +1,7 @@
+all: run
+	
+
+
 venv:
 	@uv venv
 
